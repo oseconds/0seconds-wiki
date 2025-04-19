@@ -30,10 +30,16 @@
 			description: '다양한 ADSR 설정을 직접 조절하며 소리의 변화를 경험해보세요.'
 		},
 		{
-			title: '파형 시각화 도구',
-			slug: '/demos/waveform',
-			thumbnail: '/images/waveform-demo.jpg',
-			description: '다양한 파형을 시각적으로 확인하고 소리로 들어보세요.'
+			title: '사운드 시각화',
+			slug: '/demos/sound-visualizer',
+			thumbnail: '/images/sound-visualizer-demo.jpg',
+			description: '실시간 오디오 파형과 주파수 스펙트럼을 시각적으로 확인해보세요.'
+		},
+		{
+			title: '생성형 아트',
+			slug: '/demos/generative-art',
+			thumbnail: '/images/generative-art-demo.jpg',
+			description: 'p5.js를 활용한 인터랙티브 미디어 아트를 경험해보세요.'
 		},
 		{
 			title: '코드 진행 실험실',
