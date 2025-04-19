@@ -1,4 +1,3 @@
-<!-- filepath: /Users/oyeongseo/Coding/0seconds-wiki/src/lib/components/interactive/p5/SoundVisualizer.svelte -->
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import P5Wrapper from './P5Wrapper.svelte';
@@ -6,356 +5,251 @@
   import type p5 from 'p5';
 
   // 시각화 설정
-  export let width = 800;
-  export let height = 400;
-  export let bgColor = '#111';
-  export let waveColor = '#5b8fb9';
-  export let freqColor = '#b15eff';
-  export let enableMic = false;
-
-  // 오디오 소스
-  export let audioURL: string | undefined = undefined;
+  export let visualizationType = 'circular'; // circular, bars, waveform
+  export let sensitivity = 1.5;
+  export let smoothing = 0.8;
+  export let colorScheme = 'spectrum'; // spectrum, gradient, monochrome
+  export let minRadius = 100;
+  export let barWidth = 15;
+  export let barSpacing = 5;
+  export let backgroundColor = '#121212';
   
-  // 내부 상태
+  // 오디오 설정
+  export let audioSource: HTMLAudioElement | null = null;
+  export let isPlaying = false;
+  
   let p5Instance: p5;
-  let isPlaying = false;
-  let audioPlayer: Tone.Player | undefined;
-  let analyser: Tone.Analyser | undefined;
-  let micAnalyser: Tone.Analyser | undefined;
-  let mic: Tone.UserMedia | undefined;
-  let waveform: Float32Array;
-  let frequencies: Float32Array;
+  let width = 800;
+  let height = 600;
   
-  // 시각화 모드
-  export let visualizationMode: 'waveform' | 'frequency' | 'both' = 'both';
+  // Tone.js 오디오 분석 객체
+  let analyser: Tone.Analyser;
+  let player: Tone.Player | null = null;
+  let fftSize = 1024;
+  let frequencyData = new Float32Array(fftSize / 2);
   
-  // p5 스케치 정의
+  // 반응형을 위한 리사이즈
+  function handleResize() {
+    const container = document.querySelector('.visualizer-wrapper');
+    if (container) {
+      const containerWidth = container.clientWidth;
+      width = Math.min(containerWidth, 800);
+      height = width * 0.75; // 4:3 비율
+      
+      if (p5Instance) {
+        p5Instance.resizeCanvas(width, height);
+      }
+    }
+  }
+
+  onMount(() => {
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    
+    // Tone.js 설정
+    analyser = new Tone.Analyser('fft', fftSize);
+    analyser.smoothing = smoothing;
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (player) {
+        player.stop();
+        player.dispose();
+      }
+      if (analyser) {
+        analyser.dispose();
+      }
+    };
+  });
+
+  // 오디오 소스 변경 감지
+  $: if (audioSource && isPlaying) {
+    setupAudioSource(audioSource);
+  }
+  
+  $: if (!isPlaying && player) {
+    player.stop();
+  }
+  
+  // 오디오 소스 설정
+  function setupAudioSource(element: HTMLAudioElement) {
+    if (Tone.context.state !== 'running') {
+      Tone.context.resume();
+    }
+    
+    if (player) {
+      player.stop();
+      player.dispose();
+    }
+    
+    player = new Tone.Player({
+      url: element.src,
+      autostart: true,
+      loop: true,
+    }).connect(analyser).toDestination();
+  }
+
+  // p5.js 스케치 정의
   const sketch = (p: p5) => {
     p.setup = () => {
       p.createCanvas(width, height);
-      p.background(bgColor);
-      p.noFill();
+      p.colorMode(p.HSB, 360, 100, 100, 1);
+      p.angleMode(p.RADIANS);
+      p.noStroke();
+      p.textAlign(p.CENTER, p.CENTER);
     };
-
+    
     p.draw = () => {
-      p.background(bgColor);
+      p.background(backgroundColor);
       
-      if (waveform && (visualizationMode === 'waveform' || visualizationMode === 'both')) {
-        drawWaveform(p);
+      // Tone.js 분석기로부터 데이터 가져오기
+      if (analyser) {
+        frequencyData = analyser.getValue() as Float32Array;
       }
       
-      if (frequencies && (visualizationMode === 'frequency' || visualizationMode === 'both')) {
-        drawFrequencies(p);
+      // 데이터가 있고 플레이 중이라면 시각화 그리기
+      if (frequencyData.length > 0 && isPlaying) {
+        switch (visualizationType) {
+          case 'circular':
+            drawCircularVisualizer();
+            break;
+          case 'bars':
+            drawBarsVisualizer();
+            break;
+          case 'waveform':
+            drawWaveformVisualizer();
+            break;
+        }
+      } else {
+        // 재생 중이 아니라면 안내 메시지 표시
+        p.fill(200);
+        p.textSize(18);
+        p.text("오디오를 재생하여 시각화를 시작하세요", width/2, height/2);
       }
     };
+    
+    // 원형 시각화
+    function drawCircularVisualizer() {
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const bins = 64; // 표시할 주파수 밴드 수
+      const step = Math.floor(frequencyData.length / bins);
+      
+      p.push();
+      p.translate(centerX, centerY);
+      
+      for (let i = 0; i < bins; i++) {
+        const index = i * step;
+        const value = Math.max(0, frequencyData[index] + 140) * sensitivity; // dB 값을 양수로 변환
+        const angle = p.map(i, 0, bins, 0, p.TWO_PI);
+        
+        // 주파수에 따른 반지름 계산
+        const radius = minRadius + value * 2;
+        
+        // 색상 설정
+        if (colorScheme === 'spectrum') {
+          p.fill(i * (360/bins), 80, 90, 0.7);
+        } else if (colorScheme === 'gradient') {
+          const hue = p.map(value, 0, 100, 180, 360);
+          p.fill(hue, 80, 90, 0.7);
+        } else {
+          p.fill(220, 30, p.map(value, 0, 100, 40, 90), 0.7);
+        }
+        
+        // 원형 막대 그리기
+        const x1 = minRadius * Math.cos(angle);
+        const y1 = minRadius * Math.sin(angle);
+        const x2 = radius * Math.cos(angle);
+        const y2 = radius * Math.sin(angle);
+        
+        p.strokeWeight(3);
+        p.stroke(p.hue(p.drawingContext.fillStyle), 80, 90, 0.7);
+        p.line(x1, y1, x2, y2);
+        
+        p.noStroke();
+        p.ellipse(x2, y2, 5, 5);
+      }
+      p.pop();
+    }
+    
+    // 바 시각화
+    function drawBarsVisualizer() {
+      const bins = Math.floor(width / (barWidth + barSpacing));
+      const step = Math.floor(frequencyData.length / bins);
+      
+      for (let i = 0; i < bins; i++) {
+        const index = i * step;
+        const value = Math.max(0, frequencyData[index] + 140) * sensitivity;
+        const barHeight = p.map(value, 0, 100, 5, height * 0.8);
+        const x = i * (barWidth + barSpacing) + barSpacing;
+        
+        // 색상 설정
+        if (colorScheme === 'spectrum') {
+          p.fill(i * (360/bins), 80, 90);
+        } else if (colorScheme === 'gradient') {
+          const hue = p.map(value, 0, 100, 180, 360);
+          p.fill(hue, 80, 90);
+        } else {
+          p.fill(220, 30, p.map(value, 0, 100, 40, 90));
+        }
+        
+        // 바 그리기
+        p.rect(x, height - barHeight, barWidth, barHeight, 4);
+        
+        // 바 상단에 작은 원 추가
+        p.fill(p.hue(p.drawingContext.fillStyle), 80, 100);
+        p.ellipse(x + barWidth/2, height - barHeight - 3, barWidth * 0.8, barWidth * 0.8);
+      }
+    }
+    
+    // 웨이브폼 시각화
+    function drawWaveformVisualizer() {
+      const centerY = height / 2;
+      const bins = width;
+      const step = Math.floor(frequencyData.length / bins);
+      
+      p.stroke(80, 200, 255);
+      p.strokeWeight(2);
+      p.noFill();
+      
+      p.beginShape();
+      for (let i = 0; i < bins; i++) {
+        const index = i * step;
+        const value = Math.max(0, frequencyData[index] + 140) * sensitivity;
+        const amplitude = p.map(value, 0, 100, 5, height * 0.4);
+        
+        // 색상 설정
+        if (colorScheme === 'spectrum') {
+          p.stroke(i * (360/bins), 80, 90);
+        } else if (colorScheme === 'gradient') {
+          const hue = p.map(value, 0, 100, 180, 360);
+          p.stroke(hue, 80, 90);
+        } else {
+          p.stroke(220, 30, p.map(value, 0, 100, 40, 90));
+        }
+        
+        // 웨이브폼 포인트
+        const x = i;
+        const y = centerY + amplitude * Math.sin(i * 0.05 + p.frameCount * 0.02);
+        p.point(x, y);
+        
+        if (i % 3 === 0) { // 성능을 위해 일부 포인트만 선으로 연결
+          p.vertex(x, y);
+        }
+      }
+      p.endShape();
+    }
   };
-
-  function drawWaveform(p: p5) {
-    p.stroke(waveColor);
-    p.strokeWeight(2);
-    p.beginShape();
-    
-    // 파형 그리기
-    for (let i = 0; i < waveform.length; i++) {
-      const x = p.map(i, 0, waveform.length - 1, 0, width);
-      const y = p.map(waveform[i], -1, 1, height * 0.75, height * 0.25);
-      p.vertex(x, y);
-    }
-    
-    p.endShape();
-  }
-
-  function drawFrequencies(p: p5) {
-    p.noStroke();
-    p.fill(freqColor);
-    
-    // 주파수 스펙트럼 그리기
-    const barWidth = width / frequencies.length;
-    
-    for (let i = 0; i < frequencies.length; i++) {
-      const freq = frequencies[i];
-      const barHeight = p.map(freq, -100, 0, 0, height * 0.5);
-      const x = i * barWidth;
-      const y = height - barHeight;
-      
-      // 주파수에 따라 색상 변경
-      const hue = p.map(i, 0, frequencies.length, 180, 360);
-      p.fill(p.color(`hsla(${hue}, 80%, 50%, 0.7)`));
-      
-      p.rect(x, y, barWidth, barHeight);
-    }
-  }
-
-  // 오디오 초기화 및 재생
-  async function initAudio() {
-    try {
-      await Tone.start();
-      
-      if (audioURL) {
-        // 외부 오디오 파일 사용
-        audioPlayer = new Tone.Player({
-          url: audioURL,
-          loop: true,
-          autostart: false,
-          onload: () => {
-            console.log("Audio loaded");
-          },
-        }).toDestination();
-
-        // 분석기 설정
-        analyser = new Tone.Analyser({
-          type: "waveform",
-          size: 1024,
-        });
-        
-        audioPlayer.connect(analyser);
-        
-        // 주파수 분석기
-        const freqAnalyser = new Tone.Analyser({
-          type: "fft",
-          size: 64,
-        });
-        
-        audioPlayer.connect(freqAnalyser);
-
-        // 분석 루프
-        const updateAnalysers = () => {
-          if (analyser && freqAnalyser) {
-            waveform = analyser.getValue() as Float32Array;
-            frequencies = freqAnalyser.getValue() as Float32Array;
-          }
-          requestAnimationFrame(updateAnalysers);
-        };
-        
-        updateAnalysers();
-      }
-      
-      // 마이크 사용 설정
-      if (enableMic) {
-        mic = new Tone.UserMedia();
-        await mic.open();
-        
-        micAnalyser = new Tone.Analyser({
-          type: "waveform",
-          size: 1024,
-        });
-        
-        // 주파수 분석기
-        const micFreqAnalyser = new Tone.Analyser({
-          type: "fft",
-          size: 64,
-        });
-        
-        mic.connect(micAnalyser);
-        mic.connect(micFreqAnalyser);
-
-        // 분석 루프
-        const updateMicAnalysers = () => {
-          if (micAnalyser && micFreqAnalyser) {
-            waveform = micAnalyser.getValue() as Float32Array;
-            frequencies = micFreqAnalyser.getValue() as Float32Array;
-          }
-          requestAnimationFrame(updateMicAnalysers);
-        };
-        
-        updateMicAnalysers();
-      }
-    } catch (error) {
-      console.error("오디오 초기화 오류:", error);
-    }
-  }
-
-  async function togglePlayback() {
-    if (!isPlaying) {
-      if (enableMic && mic) {
-        // 마이크 시작
-        await Tone.start();
-        isPlaying = true;
-      } else if (audioPlayer) {
-        // 오디오 플레이어 시작
-        await Tone.start();
-        audioPlayer.start();
-        isPlaying = true;
-      }
-    } else {
-      if (enableMic && mic) {
-        // 마이크는 중지만 하고 닫지 않음
-        isPlaying = false;
-      } else if (audioPlayer) {
-        audioPlayer.stop();
-        isPlaying = false;
-      }
-    }
-  }
-
-  // 마이크 활성화 토글
-  async function toggleMic() {
-    enableMic = !enableMic;
-    
-    // 오디오 플레이어 중지
-    if (audioPlayer && isPlaying) {
-      audioPlayer.stop();
-      isPlaying = false;
-    }
-    
-    // 마이크 다시 초기화
-    if (mic) {
-      mic.close();
-      mic = undefined;
-    }
-    
-    // 새로운 설정으로 오디오 초기화
-    await initAudio();
-  }
-
-  onMount(async () => {
-    await initAudio();
-  });
-
-  onDestroy(() => {
-    if (audioPlayer) {
-      audioPlayer.stop();
-      audioPlayer.dispose();
-    }
-    
-    if (mic) {
-      mic.close();
-    }
-    
-    if (analyser) {
-      analyser.dispose();
-    }
-    
-    if (micAnalyser) {
-      micAnalyser.dispose();
-    }
-  });
 </script>
 
-<div class="sound-visualizer">
+<div class="visualizer-wrapper">
   <P5Wrapper {sketch} {width} {height} bind:p5Instance />
-  
-  <div class="controls">
-    <button on:click={togglePlayback} class="control-btn">
-      {isPlaying ? '정지' : '시작'}
-    </button>
-    
-    <div class="mode-selector">
-      <label>
-        <input type="radio" bind:group={visualizationMode} value="waveform">
-        <span>파형</span>
-      </label>
-      
-      <label>
-        <input type="radio" bind:group={visualizationMode} value="frequency">
-        <span>주파수</span>
-      </label>
-      
-      <label>
-        <input type="radio" bind:group={visualizationMode} value="both">
-        <span>모두</span>
-      </label>
-    </div>
-    
-    <div class="mic-toggle">
-      <label>
-        <input type="checkbox" bind:checked={enableMic} on:change={toggleMic}>
-        <span>마이크 사용</span>
-      </label>
-    </div>
-  </div>
-  
-  <div class="description">
-    <h3>사운드 시각화 데모</h3>
-    <p>
-      이 데모는 오디오 신호(파형)와 주파수 스펙트럼을 실시간으로 시각화합니다. 
-      '시작' 버튼을 클릭하여 기본 오디오를 재생하거나, '마이크 사용' 옵션을 켜서 
-      자신의 목소리나 주변 소리를 시각화해 보세요.
-    </p>
-    <p>
-      파형은 소리의 진폭(볼륨)을 시간에 따라 보여주고, 
-      주파수 스펙트럼은 각 주파수 대역의 에너지를 색깔 막대로 표시합니다.
-    </p>
-  </div>
 </div>
 
 <style>
-  .sound-visualizer {
-    background: #111;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-  }
-  
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-    margin: 1.5rem 0;
-    align-items: center;
-  }
-  
-  .control-btn {
-    padding: 0.6rem 1.2rem;
-    background-color: #5b8fb9;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.2s;
-  }
-  
-  .control-btn:hover {
-    background-color: #4a759a;
-  }
-  
-  .mode-selector {
-    display: flex;
-    gap: 1rem;
-  }
-  
-  label {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: #ccc;
-    cursor: pointer;
-  }
-  
-  input[type="radio"],
-  input[type="checkbox"] {
-    cursor: pointer;
-    accent-color: #5b8fb9;
-  }
-  
-  .description {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 1rem;
-    border-radius: 4px;
-    margin-top: 1.5rem;
-  }
-  
-  .description h3 {
-    margin-top: 0;
-    color: white;
-  }
-  
-  .description p {
-    color: #ccc;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    margin: 0.5rem 0;
-  }
-  
-  @media (max-width: 768px) {
-    .controls {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .mode-selector {
-      flex-wrap: wrap;
-    }
+  .visualizer-wrapper {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
   }
 </style>

@@ -1,7 +1,7 @@
 <!-- filepath: /Users/oyeongseo/Coding/0seconds-wiki/src/lib/components/interactive/p5/P5Wrapper.svelte -->
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import p5 from 'p5/lib/p5.min.js';
+  import p5 from 'p5';
   
   // p5.js 스케치 함수
   export let sketch: (p: p5) => void;

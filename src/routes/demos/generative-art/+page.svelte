@@ -1,414 +1,520 @@
-<!-- filepath: /Users/oyeongseo/Coding/0seconds-wiki/src/routes/demos/generative-art/+page.svelte -->
 <script lang="ts">
   import GenerativeArt from '$lib/components/interactive/p5/GenerativeArt.svelte';
-  import { onMount } from 'svelte';
+
+  // 제어 가능한 파라미터
+  let particleCount = 100;
+  let particleSpeed = 2;
+  let particleSize = 5;
+  let colorMode = 'rainbow';
+  let backgroundColor = '#121212';
+  let lineOpacity = 0.2;
+  let noiseScale = 0.01;
+  let noiseStrength = 1;
   
-  // 색상 팔레트 프리셋
-  const colorPresets = {
-    neon: ['#ff00ff', '#00ffff', '#ffff00', '#00ff00', '#ff0000', '#0000ff'],
-    pastel: ['#ffcdb2', '#ffb4a2', '#e5989b', '#b5838d', '#6d6875'],
-    ocean: ['#03045e', '#023e8a', '#0077b6', '#0096c7', '#00b4d8', '#48cae4'],
-    sunset: ['#ff7700', '#ff9500', '#ffb700', '#ffda00', '#d8f8b7'],
-    monochrome: ['#fafafa', '#e0e0e0', '#9e9e9e', '#616161', '#212121']
+  // 프리셋 설정
+  const presets = {
+    calm: {
+      particleCount: 80,
+      particleSpeed: 1,
+      particleSize: 4,
+      colorMode: 'monochrome',
+      backgroundColor: '#0a192f',
+      lineOpacity: 0.15,
+      noiseScale: 0.005,
+      noiseStrength: 0.7
+    },
+    energetic: {
+      particleCount: 150,
+      particleSpeed: 3,
+      particleSize: 6,
+      colorMode: 'rainbow',
+      backgroundColor: '#000000',
+      lineOpacity: 0.25,
+      noiseScale: 0.02,
+      noiseStrength: 1.5
+    },
+    minimal: {
+      particleCount: 50,
+      particleSpeed: 1.5,
+      particleSize: 3,
+      colorMode: 'custom',
+      backgroundColor: '#ffffff',
+      lineOpacity: 0.1,
+      noiseScale: 0.008,
+      noiseStrength: 0.5
+    }
   };
   
-  // 선택된 색상 팔레트
-  let selectedPalette: keyof typeof colorPresets = 'neon';
-  let colorPalette = colorPresets[selectedPalette];
-  
-  // 화면 크기에 따른 캔버스 크기 조정
-  let containerWidth = 800;
-  let containerHeight = 600;
-  
-  // 색상 팔레트 변경 함수
-  function changePalette(palette: keyof typeof colorPresets) {
-    selectedPalette = palette;
-    colorPalette = colorPresets[palette];
+  // 프리셋 적용 함수
+  function applyPreset(preset: string) {
+    const settings = presets[preset as keyof typeof presets];
+    if (settings) {
+      particleCount = settings.particleCount;
+      particleSpeed = settings.particleSpeed;
+      particleSize = settings.particleSize;
+      colorMode = settings.colorMode;
+      backgroundColor = settings.backgroundColor;
+      lineOpacity = settings.lineOpacity;
+      noiseScale = settings.noiseScale;
+      noiseStrength = settings.noiseStrength;
+    }
   }
   
-  onMount(() => {
-    const updateSize = () => {
-      const container = document.querySelector('.demo-container');
-      if (container) {
-        containerWidth = container.clientWidth;
-        containerHeight = Math.min(window.innerHeight * 0.7, 600);
-      }
-    };
-    
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    
-    return () => {
-      window.removeEventListener('resize', updateSize);
-    };
-  });
+  // 커스텀 색상 설정
+  let customColors = ['#FF5722', '#03A9F4', '#4CAF50', '#FFC107', '#9C27B0'];
 </script>
 
 <svelte:head>
-  <title>생성형 아트 - 0seconds Wiki</title>
-  <meta name="description" content="p5.js를 이용한 인터랙티브 생성형 아트 데모" />
+  <title>제너레이티브 아트 | 0seconds Wiki</title>
+  <meta name="description" content="p5.js를 활용한 인터랙티브 제너레이티브 아트를 경험해보세요." />
 </svelte:head>
 
-<div class="demo-container">
-  <h1>생성형 아트 <span class="subtitle">Generative Art</span></h1>
-  
-  <div class="intro">
+<div class="generative-art-page">
+  <header>
+    <h1>인터랙티브 제너레이티브 아트</h1>
     <p>
-      생성형 아트는 알고리즘, 수학적 규칙, 또는 자연 현상에서 영감을 받은 절차로
-      자동으로 생성된 예술 작품입니다. 이 페이지에서는 p5.js를 활용해 인터랙티브한
-      생성형 아트의 다양한 예시를 보여드립니다.
+      알고리즘을 활용한 생성적 예술을 경험해보세요. 마우스로 화면을 드래그하면 
+      파티클들이 마우스 포인터를 향해 이동합니다. 아래의 컨트롤을 조정하여 
+      다양한 시각적 효과를 만들어보세요.
     </p>
-  </div>
+  </header>
 
   <section class="demo-section">
-    <h2>인터랙티브 생성형 패턴</h2>
-    
-    <div class="palette-selector">
-      <h3>색상 팔레트</h3>
-      <div class="palette-buttons">
-        {#each Object.entries(colorPresets) as [name, colors]}
-          <button 
-            class="palette-btn" 
-            class:active={selectedPalette === name}
-            on:click={() => changePalette(name as keyof typeof colorPresets)}
-          >
-            <div class="palette-preview">
-              {#each colors as color}
-                <span class="color-sample" style="background-color: {color};"></span>
-              {/each}
-            </div>
-            <span class="palette-name">{name}</span>
-          </button>
-        {/each}
-      </div>
+    <div class="canvas-container">
+      <GenerativeArt
+        {particleCount}
+        {particleSpeed}
+        {particleSize}
+        {colorMode}
+        {backgroundColor}
+        {lineOpacity}
+        {noiseScale}
+        {noiseStrength}
+        {customColors}
+      />
     </div>
     
-    <GenerativeArt 
-      width={containerWidth} 
-      height={containerHeight}
-      {colorPalette}
-    />
-    
-    <div class="interaction-guide">
-      <h3>인터랙션 가이드</h3>
-      <div class="guide-grid">
-        <div class="guide-item">
-          <div class="icon">🖱️</div>
-          <div class="guide-text">
-            <strong>마우스 클릭과 드래그:</strong> 새로운 패턴을 생성하거나 기존 패턴 변형하기
+    <div class="controls-container">
+      <div class="presets">
+        <h3>프리셋</h3>
+        <div class="preset-buttons">
+          <button on:click={() => applyPreset('calm')}>고요한 흐름</button>
+          <button on:click={() => applyPreset('energetic')}>활기찬 파티클</button>
+          <button on:click={() => applyPreset('minimal')}>미니멀</button>
+        </div>
+      </div>
+      
+      <div class="slider-controls">
+        <h3>설정</h3>
+        
+        <div class="control">
+          <label for="particle-count">파티클 개수: {particleCount}</label>
+          <input 
+            id="particle-count" 
+            type="range" 
+            min="10" 
+            max="300" 
+            step="5" 
+            bind:value={particleCount} 
+          />
+        </div>
+        
+        <div class="control">
+          <label for="particle-speed">속도: {particleSpeed}</label>
+          <input 
+            id="particle-speed" 
+            type="range" 
+            min="0.5" 
+            max="5" 
+            step="0.1" 
+            bind:value={particleSpeed} 
+          />
+        </div>
+        
+        <div class="control">
+          <label for="particle-size">크기: {particleSize}px</label>
+          <input 
+            id="particle-size" 
+            type="range" 
+            min="1" 
+            max="15" 
+            step="0.5" 
+            bind:value={particleSize} 
+          />
+        </div>
+        
+        <div class="control">
+          <label for="line-opacity">선 투명도: {lineOpacity}</label>
+          <input 
+            id="line-opacity" 
+            type="range" 
+            min="0" 
+            max="1" 
+            step="0.05" 
+            bind:value={lineOpacity} 
+          />
+        </div>
+        
+        <div class="control">
+          <label for="noise-scale">노이즈 스케일: {noiseScale}</label>
+          <input 
+            id="noise-scale" 
+            type="range" 
+            min="0.001" 
+            max="0.05" 
+            step="0.001" 
+            bind:value={noiseScale} 
+          />
+        </div>
+        
+        <div class="control">
+          <label for="noise-strength">노이즈 강도: {noiseStrength}</label>
+          <input 
+            id="noise-strength" 
+            type="range" 
+            min="0.1" 
+            max="3" 
+            step="0.1" 
+            bind:value={noiseStrength} 
+          />
+        </div>
+        
+        <div class="control">
+          <label for="color-mode">색상 모드:</label>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="colorMode" value="rainbow" bind:group={colorMode} />
+              무지개
+            </label>
+            <label>
+              <input type="radio" name="colorMode" value="monochrome" bind:group={colorMode} />
+              단색
+            </label>
+            <label>
+              <input type="radio" name="colorMode" value="custom" bind:group={colorMode} />
+              커스텀
+            </label>
           </div>
         </div>
-        <div class="guide-item">
-          <div class="icon">⌨️</div>
-          <div class="guide-text">
-            <strong>스페이스바:</strong> 캔버스 초기화하기
-          </div>
-        </div>
-        <div class="guide-item">
-          <div class="icon">🔄</div>
-          <div class="guide-text">
-            <strong>패턴 변경:</strong> 위의 라디오 버튼으로 다른 알고리즘 선택하기
-          </div>
-        </div>
-        <div class="guide-item">
-          <div class="icon">🎨</div>
-          <div class="guide-text">
-            <strong>색상 팔레트:</strong> 다양한 색상 팔레트로 분위기 바꾸기
-          </div>
+        
+        <div class="control">
+          <label for="background-color">배경색:</label>
+          <input 
+            id="background-color" 
+            type="color" 
+            bind:value={backgroundColor} 
+          />
         </div>
       </div>
     </div>
   </section>
-
-  <section class="theory-section">
-    <h2>생성형 아트의 원리</h2>
+  
+  <section class="explanation">
+    <h2>제너레이티브 아트란?</h2>
+    <p>
+      제너레이티브 아트(Generative Art)는 알고리즘, 수학적 규칙, 또는 자율적인 시스템을 통해 
+      창작되는 예술 형태입니다. 작가는 직접 작품을 그리는 것이 아니라, 작품이 스스로 생성될 수 
+      있는 규칙과 시스템을 설계합니다.
+    </p>
     
-    <div class="theory-columns">
-      <div class="theory-column">
-        <h3>알고리즘과 예술</h3>
+    <div class="info-grid">
+      <div class="info-card">
+        <h3>퍼린 노이즈(Perlin Noise)</h3>
         <p>
-          생성형 아트는 알고리즘을 통해 예술 작품을 만드는 방식입니다. 
-          작가는 직접 모든 요소를 그리는 대신, 규칙과 시스템을 디자인하고 
-          그 과정에서 발생하는 결과물을 예술 작품으로 활용합니다. 이러한 접근은
-          복잡한 패턴을 만들고, 우연성과 결정론적 과정 사이의 균형을 탐색하는 
-          새로운 방법을 제시합니다.
-        </p>
-        
-        <h3>웹에서의 생성형 아트</h3>
-        <p>
-          p5.js와 같은 자바스크립트 라이브러리는 웹 브라우저에서 생성형 아트를 
-          쉽게 구현할 수 있게 해줍니다. 이를 통해 정적인 이미지를 넘어 실시간으로
-          변화하고, 사용자와 상호작용하는 동적인 작품을 만들 수 있습니다.
+          이 데모에서 사용된 핵심 알고리즘 중 하나는 퍼린 노이즈입니다. 1983년 켄 퍼린(Ken Perlin)이 
+          개발한 이 알고리즘은 자연스러운 움직임과 패턴을 생성하는 데 사용됩니다. 파티클의 움직임이 
+          무작위적이면서도 유기적인 흐름을 가지는 것이 이 알고리즘 덕분입니다.
         </p>
       </div>
       
-      <div class="theory-column">
-        <h3>수학적 기반</h3>
+      <div class="info-card">
+        <h3>창발성(Emergence)</h3>
         <p>
-          많은 생성형 아트 알고리즘은 수학적 개념을 기반으로 합니다:
+          각 파티클은 간단한 규칙을 따르지만, 수백 개의 파티클이 상호작용하면서 복잡하고 예측할 수 없는 
+          패턴이 형성됩니다. 이러한 현상을 '창발성'이라고 하며, 제너레이티브 아트의 핵심 특성 중 하나입니다.
         </p>
-        <ul>
-          <li><strong>프랙탈(Fractals):</strong> 자기 유사성을 갖는 패턴으로, 만델브로트 집합이 대표적입니다.</li>
-          <li><strong>펄린 노이즈(Perlin Noise):</strong> 자연스러운 무작위성을 만드는 알고리즘입니다.</li>
-          <li><strong>L-시스템(L-systems):</strong> 재귀적 규칙을 통해 복잡한 패턴을 생성합니다.</li>
-          <li><strong>셀룰러 오토마타(Cellular Automata):</strong> 간단한 규칙으로 복잡한 패턴이 발생하는 시스템입니다.</li>
-        </ul>
-        
-        <h3>예술적 응용</h3>
+      </div>
+      
+      <div class="info-card">
+        <h3>인터랙티비티</h3>
         <p>
-          이러한 수학적 개념과 알고리즘은 시각 예술뿐만 아니라 음악, 건축, 게임 디자인 등
-          다양한 분야에서 창의적으로 활용됩니다. 생성형 아트는 기술과 예술의 경계를 
-          흐리게 하고, 새로운 미적 가능성을 탐구하는 방법을 제공합니다.
+          관람자의 참여는 제너레이티브 아트에 새로운 차원을 더합니다. 이 데모에서는 마우스 드래그를 통해 
+          파티클의 움직임에 영향을 줄 수 있어, 작품과 관람자 사이의 대화가 가능합니다.
+        </p>
+      </div>
+      
+      <div class="info-card">
+        <h3>매개변수 공간</h3>
+        <p>
+          슬라이더를 조정하면서 다양한 시각적 효과를 탐색할 수 있는 이 공간을 '매개변수 공간'이라고 
+          합니다. 무한히 많은 가능성 중에서 여러분이 만족하는 설정을 찾아보세요.
         </p>
       </div>
     </div>
   </section>
   
-  <section class="projects-section">
-    <h2>창작 아이디어</h2>
-    <p class="section-intro">
-      아래 아이디어를 바탕으로 자신만의 생성형 아트 프로젝트를 시작해 보세요.
-    </p>
-    
-    <div class="project-cards">
-      <div class="project-card">
-        <h3>음악 반응형 시각화</h3>
-        <p>
-          오디오 입력에 반응하는 생성형 패턴을 만들어보세요. 
-          음악의 비트, 진폭, 주파수에 따라 시각적 요소가 변화하도록 합니다.
-        </p>
-      </div>
+  <section class="further-learning">
+    <h2>더 알아보기</h2>
+    <div class="link-cards">
+      <a href="/demos/sound-visualizer" class="link-card">
+        <h3>사운드 시각화</h3>
+        <p>오디오 신호를 다양한 형태의 시각적 효과로 변환하는 예제를 살펴보세요.</p>
+      </a>
       
-      <div class="project-card">
-        <h3>자연 현상 시뮬레이션</h3>
-        <p>
-          물의 흐름, 불꽃, 구름 등 자연 현상을 알고리즘으로 시뮬레이션해보세요.
-          펄린 노이즈와 입자 시스템을 활용하면 놀라운 결과물을 얻을 수 있습니다.
-        </p>
-      </div>
+      <a href="/demos/adsr" class="link-card">
+        <h3>ADSR 엔벨로프</h3>
+        <p>소리의 시작, 지속, 감쇠, 종료를 제어하는 ADSR 엔벨로프에 대해 알아보세요.</p>
+      </a>
       
-      <div class="project-card">
-        <h3>데이터 시각화 아트</h3>
-        <p>
-          실제 데이터(날씨, 주식 시장, 소셜 미디어 활동 등)를 예술적으로 
-          시각화하는 프로젝트를 만들어보세요. 데이터의 패턴이 아름다운 시각적 형태로 변환됩니다.
-        </p>
-      </div>
+      <a href="https://p5js.org" target="_blank" rel="noopener noreferrer" class="link-card">
+        <h3>p5.js 라이브러리</h3>
+        <p>이 데모에 사용된 p5.js 라이브러리의 공식 사이트를 방문하여 더 많은 예제를 확인하세요.</p>
+      </a>
+      
+      <a href="https://openprocessing.org" target="_blank" rel="noopener noreferrer" class="link-card">
+        <h3>OpenProcessing</h3>
+        <p>창작자들이 공유하는 수많은 제너레이티브 아트 작품을 감상하고 코드를 학습해보세요.</p>
+      </a>
     </div>
   </section>
 </div>
 
 <style>
-  .demo-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem 1rem;
+  .generative-art-page {
+    max-width: 100%;
   }
   
-  h1 {
-    font-size: 2.5rem;
+  header {
+    margin-bottom: 2rem;
+  }
+  
+  header h1 {
+    font-size: 2.2rem;
     margin-bottom: 0.5rem;
-    color: #ff0080;
+    color: #fff;
+  }
+  
+  header p {
+    font-size: 1.1rem;
+    color: #ccc;
+    max-width: 800px;
+  }
+  
+  .demo-section {
+    margin-bottom: 3rem;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 2rem;
+  }
+  
+  .canvas-container {
+    width: 100%;
+    background: #0a0a0a;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+  
+  .controls-container {
+    background: #1a1a1a;
+    padding: 1.5rem;
+    border-radius: 8px;
+  }
+  
+  .presets {
+    margin-bottom: 1.5rem;
+  }
+  
+  .preset-buttons {
+    display: flex;
     gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  
+  .preset-buttons button {
+    padding: 0.6rem 1.2rem;
+    background-color: #2a2a2a;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+  
+  .preset-buttons button:hover {
+    background-color: #3a3a3a;
+  }
+  
+  .slider-controls h3, .presets h3 {
+    font-size: 1.2rem;
+    margin: 0 0 1rem;
+    color: #fff;
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.5rem;
+  }
+  
+  .control {
+    margin-bottom: 1.2rem;
+  }
+  
+  .control label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #ddd;
+    font-weight: 500;
+  }
+  
+  .control input[type="range"] {
+    width: 100%;
+    background: #2a2a2a;
+    height: 8px;
+    border-radius: 4px;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  
+  .control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #5b8fb9;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  
+  .control input[type="color"] {
+    width: 60px;
+    height: 30px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .radio-group {
+    display: flex;
+    gap: 1.5rem;
     flex-wrap: wrap;
   }
   
-  .subtitle {
-    font-size: 1.8rem;
-    opacity: 0.6;
-    font-weight: 300;
+  .radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+  
+  .radio-group input {
+    cursor: pointer;
   }
   
   h2 {
     font-size: 1.8rem;
     margin: 2rem 0 1rem;
-    color: #00ffff;
-    border-bottom: 2px solid rgba(0, 255, 255, 0.3);
-    padding-bottom: 0.5rem;
+    color: #fff;
+    position: relative;
   }
   
-  h3 {
-    font-size: 1.4rem;
-    margin: 1.5rem 0 0.75rem;
-    color: #ffff00;
+  h2::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -0.5rem;
+    width: 60px;
+    height: 3px;
+    background: #5b8fb9;
   }
   
-  .intro {
-    font-size: 1.2rem;
-    line-height: 1.6;
-    margin-bottom: 2.5rem;
-    color: #e9e9e9;
-  }
-  
-  .demo-section {
+  .explanation {
     margin-bottom: 3rem;
   }
   
-  .palette-selector {
-    margin-bottom: 1.5rem;
-  }
-  
-  .palette-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .palette-btn {
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 0.5rem;
-    cursor: pointer;
-    transition: transform 0.2s, border-color 0.2s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .palette-btn:hover {
-    transform: translateY(-3px);
-    border-color: rgba(255, 255, 255, 0.3);
-  }
-  
-  .palette-btn.active {
-    border-color: #00ffff;
-    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-  }
-  
-  .palette-preview {
-    display: flex;
-    gap: 2px;
-    margin-bottom: 0.5rem;
-  }
-  
-  .color-sample {
-    width: 1rem;
-    height: 1rem;
-    border-radius: 2px;
-  }
-  
-  .palette-name {
-    font-size: 0.8rem;
-    color: #ccc;
-    text-transform: capitalize;
-  }
-  
-  .interaction-guide {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-top: 2rem;
-  }
-  
-  .guide-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-top: 1rem;
-  }
-  
-  .guide-item {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-  }
-  
-  .icon {
-    font-size: 2rem;
-  }
-  
-  .guide-text {
-    font-size: 0.9rem;
-    color: #ccc;
-    line-height: 1.5;
-  }
-  
-  .guide-text strong {
-    color: #00ffff;
-    display: block;
-    margin-bottom: 0.25rem;
-  }
-  
-  .theory-section {
-    margin-bottom: 3rem;
-  }
-  
-  .theory-columns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-  }
-  
-  .theory-column p {
-    margin-bottom: 1.5rem;
-    line-height: 1.6;
-    color: #bbb;
-  }
-  
-  .theory-column ul {
-    padding-left: 1.5rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .theory-column li {
-    margin-bottom: 0.5rem;
-    color: #bbb;
-    line-height: 1.5;
-  }
-  
-  .projects-section {
-    margin-bottom: 3rem;
-  }
-  
-  .section-intro {
-    font-size: 1.1rem;
-    margin-bottom: 1.5rem;
-    color: #ccc;
-  }
-  
-  .project-cards {
+  .info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
+    margin-top: 2rem;
   }
   
-  .project-card {
-    background: linear-gradient(to bottom right, rgba(255, 0, 128, 0.1), rgba(0, 255, 255, 0.1));
-    border-radius: 8px;
+  .info-card {
+    background: #1a1a1a;
     padding: 1.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: transform 0.3s, box-shadow 0.3s;
+    border-radius: 8px;
   }
   
-  .project-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  }
-  
-  .project-card h3 {
+  .info-card h3 {
+    font-size: 1.3rem;
     margin-top: 0;
+    margin-bottom: 1rem;
+    color: #fff;
   }
   
-  .project-card p {
+  .info-card p {
     color: #ccc;
     line-height: 1.5;
+    margin: 0;
+  }
+  
+  .further-learning {
+    margin-bottom: 3rem;
+  }
+  
+  .link-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  
+  .link-card {
+    background: #1a1a1a;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: transform 0.2s;
+    display: block;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .link-card:hover {
+    transform: translateY(-5px);
+    background: #222;
+  }
+  
+  .link-card h3 {
+    font-size: 1.3rem;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    color: #5b8fb9;
+  }
+  
+  .link-card p {
+    color: #ccc;
+    font-size: 0.9rem;
+    margin: 0;
+  }
+  
+  @media (min-width: 768px) {
+    .demo-section {
+      flex-direction: row;
+    }
+    
+    .canvas-container {
+      flex: 2;
+    }
+    
+    .controls-container {
+      flex: 1;
+    }
   }
   
   @media (max-width: 768px) {
-    h1 {
-      font-size: 2rem;
-    }
-    
-    .theory-columns {
-      grid-template-columns: 1fr;
-    }
-    
-    .palette-buttons {
-      justify-content: center;
+    .radio-group {
+      flex-direction: column;
+      gap: 0.8rem;
     }
   }
 </style>
